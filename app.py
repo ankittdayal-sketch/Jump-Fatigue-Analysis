@@ -6,11 +6,11 @@ Docs: http://127.0.0.1:8000/docs
 
 from __future__ import annotations
 from datetime import date
-from typing import Optional
+from typing import List
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from simulator import DailyInput, Flag, SimulatorResult, run_simulation
 
@@ -20,47 +20,45 @@ from simulator import DailyInput, Flag, SimulatorResult, run_simulation
 # ---------------------------------------------------------------------------
 
 class SimulateRequest(BaseModel):
-    date: date = Field(default_factory=date.today, description="Date of the training session")
+    date: date = Field(default_factory=date.today)
 
-    # Physiological
-    hrv_today: float = Field(..., ge=0, le=250, description="Today's HRV in ms")
-    hrv_baseline_30d: float = Field(..., ge=0, le=250, description="30-day average HRV in ms")
-    deep_sleep_min: float = Field(..., ge=0, le=300, description="Minutes of deep sleep last night")
-    water_liters: float = Field(..., ge=0, le=10, description="Total water intake in litres")
-    protein_g: float = Field(..., ge=0, le=500, description="Total protein intake in grams")
-    body_weight_kg: float = Field(..., ge=30, le=200, description="Body weight in kg")
+    hrv_today: float = Field(..., ge=0, le=250)
+    hrv_baseline_30d: float = Field(..., ge=0, le=250)
+    deep_sleep_min: float = Field(..., ge=0, le=300)
+    water_liters: float = Field(..., ge=0, le=10)
+    protein_g: float = Field(..., ge=0, le=500)
+    body_weight_kg: float = Field(..., ge=30, le=200)
 
-    # Training load
-    jumps_today: int = Field(..., ge=0, le=1000, description="Jump reps in today's session")
-    rpe: float = Field(..., ge=1, le=10, description="Rate of perceived exertion (1–10)")
-    acute_load_7d: int = Field(..., ge=0, description="Total jumps over the past 7 days")
-    chronic_load_weekly_avg: int = Field(..., ge=0, description="Average weekly jumps over the past 28 days")
+    jumps_today: int = Field(..., ge=0, le=1000)
+    rpe: float = Field(..., ge=1, le=10)
+    acute_load_7d: int = Field(..., ge=0)
+    chronic_load_weekly_avg: int = Field(..., ge=0)
 
-    # Asymmetry / stiffness
-    morning_stiffness_days: int = Field(..., ge=0, le=30, description="Consecutive days of morning stiffness")
-    one_sided_soreness_hrs: float = Field(..., ge=0, le=200, description="Hours of one-sided soreness")
+    morning_stiffness_days: int = Field(..., ge=0, le=30)
+    one_sided_soreness_hrs: float = Field(..., ge=0, le=200)
 
-    # Journal
-    journal_entry: str = Field(default="", description="Free-text daily journal entry")
-    mood_quote: str = Field(default="", description="Optional mood quote")
+    journal_entry: str = Field(default="")
+    mood_quote: str = Field(default="")
 
-    model_config = {"json_schema_extra": {
-        "example": {
-            "hrv_today": 58,
-            "hrv_baseline_30d": 72,
-            "deep_sleep_min": 85,
-            "water_liters": 2.2,
-            "protein_g": 110,
-            "body_weight_kg": 75,
-            "jumps_today": 140,
-            "rpe": 8,
-            "acute_load_7d": 820,
-            "chronic_load_weekly_avg": 500,
-            "morning_stiffness_days": 2,
-            "one_sided_soreness_hrs": 36,
-            "journal_entry": "Feeling a bit sluggish today, knees are achy.",
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "hrv_today": 58,
+                "hrv_baseline_30d": 72,
+                "deep_sleep_min": 85,
+                "water_liters": 2.2,
+                "protein_g": 110,
+                "body_weight_kg": 75,
+                "jumps_today": 140,
+                "rpe": 8,
+                "acute_load_7d": 820,
+                "chronic_load_weekly_avg": 500,
+                "morning_stiffness_days": 2,
+                "one_sided_soreness_hrs": 36,
+                "journal_entry": "Feeling a bit sluggish today, knees are achy.",
+            }
         }
-    }}
+    }
 
 
 class FlagOut(BaseModel):
@@ -77,14 +75,14 @@ class SimulateResponse(BaseModel):
     zone: str
     zone_label: str
     zone_description: str
-    flags: list[FlagOut]
+    flags: List[FlagOut]
     ac_ratio: float
     protein_per_kg: float
     hrv_drop_sd: float
     sentiment_zone: str
-    sentiment_keywords: list[str]
+    sentiment_keywords: List[str]
     quote_of_the_day: str
-    recommendations: list[str]
+    recommendations: List[str]
 
 
 def result_to_response(r: SimulatorResult) -> SimulateResponse:
@@ -114,8 +112,8 @@ def result_to_response(r: SimulatorResult) -> SimulateResponse:
 app = FastAPI(
     title="Volleyball Injury Prevention Simulator",
     description=(
-        "DNN-inspired daily readiness & injury risk engine for volleyball athletes. "
-        "Submit daily physiological, training-load, and journal data; receive a "
+        "DNN-inspired daily readiness and injury risk engine for volleyball athletes. "
+        "Submit daily physiological, training-load, and journal data to receive a "
         "readiness score, injury risk %, active flags, and personalised recommendations."
     ),
     version="1.0.0",
@@ -143,9 +141,8 @@ def health():
 def simulate(body: SimulateRequest):
     """
     Run the injury-prevention simulation for a single training day.
-
-    Returns a **readiness score (0–100)**, **injury risk %**, active **flags**,
-    and personalised **recommendations**.
+    Returns a readiness score (0-100), injury risk %, active flags,
+    and personalised recommendations.
     """
     inp = DailyInput(
         date=body.date,
@@ -174,22 +171,22 @@ def flag_definitions():
     return {
         "OVERREACH": {
             "level": "danger",
-            "trigger": "Acute:Chronic workload ratio > 1.5×",
+            "trigger": "Acute:Chronic workload ratio > 1.5x",
             "description": "Leading predictor of soft-tissue injury in jump-sport athletes.",
         },
         "OVERREACH_MILD": {
             "level": "warning",
-            "trigger": "A:C ratio between 1.2–1.5×",
+            "trigger": "A:C ratio between 1.2-1.5x",
             "description": "Borderline overreach — monitor carefully.",
         },
         "CNS_FATIGUE": {
             "level": "danger",
-            "trigger": "HRV drops ≥ 2 SD below 30-day baseline",
+            "trigger": "HRV drops >= 2 SD below 30-day baseline",
             "description": "Central nervous system recovery is compromised.",
         },
         "TENDON_DESICCATION": {
             "level": "danger",
-            "trigger": "Morning stiffness ≥ 3 consecutive days AND water < 3 L",
+            "trigger": "Morning stiffness >= 3 consecutive days AND water < 3 L",
             "description": "Inadequate hydration reduces tendon elasticity and lubrication.",
         },
         "BIOMECH_COMPENSATION": {
@@ -204,7 +201,7 @@ def flag_definitions():
         },
         "PROTEIN_DEFICIT": {
             "level": "warning",
-            "trigger": "Protein < 1.6 g/kg AND RPE ≥ 7",
+            "trigger": "Protein < 1.6 g/kg AND RPE >= 7",
             "description": "Insufficient protein for muscle/tendon repair during high-load phases.",
         },
         "BURNOUT_SENTIMENT": {
