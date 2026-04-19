@@ -2,6 +2,7 @@ from datetime import date
 from typing import List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from simulator import DailyInput, run_simulation
 
@@ -11,7 +12,6 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 
 class SimulateRequest(BaseModel):
-    entry_date: str = ""
     hrv_today: float = 65
     hrv_baseline_30d: float = 72
     deep_sleep_min: float = 95
@@ -28,9 +28,9 @@ class SimulateRequest(BaseModel):
     mood_quote: str = ""
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def root():
-    return {"status": "ok", "message": "Volleyball Injury Prevention Simulator is running. Go to /docs to use it."}
+    return HTMLResponse(content=open("index.html").read())
 
 
 @app.get("/health")
@@ -59,7 +59,6 @@ def simulate(body: SimulateRequest):
     )
     r = run_simulation(inp)
     return {
-        "date": str(r.date),
         "readiness_score": r.readiness_score,
         "injury_risk_pct": r.injury_risk_pct,
         "zone": r.zone,
@@ -68,24 +67,6 @@ def simulate(body: SimulateRequest):
         "flags": [{"level": f.level, "code": f.code, "title": f.title, "body": f.body} for f in r.flags],
         "ac_ratio": r.ac_ratio,
         "protein_per_kg": r.protein_per_kg,
-        "hrv_drop_sd": r.hrv_drop_sd,
-        "sentiment_zone": r.sentiment_zone,
-        "sentiment_keywords": r.sentiment_keywords,
         "quote_of_the_day": r.quote_of_the_day,
         "recommendations": r.recommendations,
-    }
-
-
-@app.get("/flags/definitions")
-def flag_definitions():
-    return {
-        "OVERREACH": "A:C workload ratio > 1.5x — leading predictor of soft-tissue injury.",
-        "OVERREACH_MILD": "A:C ratio 1.2-1.5x — borderline overreach, monitor carefully.",
-        "CNS_FATIGUE": "HRV drops >= 2 SD below 30-day baseline.",
-        "TENDON_DESICCATION": "Morning stiffness >= 3 days AND water < 3L.",
-        "BIOMECH_COMPENSATION": "One-sided soreness > 48 hours.",
-        "LOW_DEEP_SLEEP": "Deep sleep < 90 minutes.",
-        "PROTEIN_DEFICIT": "Protein < 1.6g/kg AND RPE >= 7.",
-        "BURNOUT_SENTIMENT": "Red-zone keywords detected in journal.",
-        "FATIGUE_SENTIMENT": "Yellow-zone keywords detected in journal.",
     }
